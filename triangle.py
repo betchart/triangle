@@ -13,15 +13,18 @@ class TriBoard(object):
         cpy.points = copy.deepcopy(self.points)
         return cpy
     
+    def open(self, p):
+        i,j = p
+        return (0 <= i < self.size and
+                0 <= j <= i and
+                p not in self.points)
+
     def remove(self, p):
         self.points.remove(p)
         return
 
     def add(self, p):
-        i, j = p
-        assert 0 <= i < self.size
-        assert 0 <= j <= i
-        if p in self.points:
+        if not self.open(p):
             raise Exception("Occupied", p)
         self.points.add(p)
         return
@@ -31,26 +34,19 @@ class TriBoard(object):
         self.add(p2)
         return
 
-    def leapfrog(self, p, axis="_", sign=1, remove=True):
+    def neighbors(self,p):
         i,j = p
-        a,b = p
-        if axis is "_":
-            j += 2*sign
-            b += sign
-        elif axis is "/":
-            i += 2*sign
-            a += sign
-        elif axis == "\\":
-            b += sign
-            a += sign
-            j += 2*sign
-            i += 2*sign
-        else:
-            raise Exception('Bad Axis', axis)
-        self.move(p, (i,j))
-        if remove:
-            self.remove((a,b))
-        return
+        return filter(lambda ij: ij in self.points,
+                      [(i+irel,j+jrel) for irel,jrel in [(1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,-1)]])
+
+    def leapfrog(self, leaper, frog, removeFrog=True):
+        pad = tuple(2 * f - l for l,f in zip(leaper,frog))
+        if not self.open(pad):
+            return None
+        self.move(leaper, pad)
+        if removeFrog:
+            self.remove(frog)
+        return pad
 
     def __str__(self):
         rtn = ""
@@ -71,23 +67,18 @@ class TriSolutions(object):
         if not self.valid:
             self.calc()
         return
-
-    def isValid(self):
-        return self.valid
     
     def calc(self):
         for p in self.b.points:
-            for axis in "\\_/":
-                for sign in [-1,1]:
-                    try:
-                        bc = self.b.copy()
-                        bc.leapfrog(p, axis, sign)
-                        sbc = TriSolutions(bc)
-                        if sbc.isValid():
-                            self.valid = True;
-                            self.solutions.append(sbc)
-                    except Exception as e:
-                        pass
+            for neighbor in self.b.neighbors(p):
+                bc = self.b.copy()
+                res = bc.leapfrog(p, neighbor)
+                if res == None:
+                    continue
+                sbc = TriSolutions(bc)
+                if sbc.valid:
+                    self.valid = True;
+                    self.solutions.append(sbc)
         return
     
                     
@@ -108,7 +99,7 @@ def triangleSolutions(size):
         starts.append(TriSolutions(c))
         print "."
 
-    valid = filter(lambda s: s.isValid(), starts)
+    valid = filter(lambda s: s.valid, starts)
 
     print len(valid)
 
@@ -118,7 +109,6 @@ def triangleSolutions(size):
         print current.b.points
         current = current.solutions[0]
     print current.b
-
 
     print
     print
